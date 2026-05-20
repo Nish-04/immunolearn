@@ -3,6 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { ArrowLeft, CheckCircle, XCircle, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 interface Question {
   id: number;
@@ -265,6 +267,7 @@ export function DragDropGame() {
   const [score, setScore] = useState(0);
   const [answeredCorrectly, setAnsweredCorrectly] = useState<number[]>([]);
   const [gameComplete, setGameComplete] = useState(false);
+  const [savingScore, setSavingScore] = useState(false);
 
   const currentQ = questions[currentQuestion];
 
@@ -275,15 +278,57 @@ export function DragDropGame() {
     }));
   };
 
-  const handleSubmit = () => {
-    const correctCount = currentQ.items.filter(
-      (item) => placements[item.id] === item.correctZone
-    ).length;
+  const getCurrentQuestionCorrect = () => {
+    return currentQ.items.every((item) => placements[item.id] === item.correctZone);
+  };
 
-    if (
-      correctCount === currentQ.items.length &&
-      !answeredCorrectly.includes(currentQuestion)
-    ) {
+  const getPerformance = (percentage: number) => {
+    if (percentage >= 80) return "Excellent";
+    if (percentage >= 60) return "Good";
+    if (percentage > 0) return "Needs Improvement";
+    return "No activity yet";
+  };
+
+  const saveDragDropProgress = async (finalScore: number) => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("User not logged in. Score cannot be saved.");
+      return;
+    }
+
+    const percentage = Math.round((finalScore / questions.length) * 100);
+    const performance = getPerformance(percentage);
+
+    setSavingScore(true);
+
+    try {
+      await setDoc(
+        doc(db, "students", user.uid),
+        {
+          name: user.displayName || "Student",
+          email: user.email || "",
+          dragDropScore: finalScore,
+          dragDropTotal: questions.length,
+          dragDropPercentage: percentage,
+          dragDropPerformance: performance,
+          lastActivity: "Drag and Drop Activity",
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("Error saving drag drop progress:", error);
+      alert("Failed to save score. Please check your Firebase Firestore settings.");
+    } finally {
+      setSavingScore(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    const isAllCorrect = getCurrentQuestionCorrect();
+
+    if (isAllCorrect && !answeredCorrectly.includes(currentQuestion)) {
       setScore((prev) => prev + 1);
       setAnsweredCorrectly((prev) => [...prev, currentQuestion]);
     }
@@ -291,12 +336,19 @@ export function DragDropGame() {
     setShowFeedback(true);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    const finalScore = answeredCorrectly.includes(currentQuestion)
+      ? score
+      : getCurrentQuestionCorrect()
+      ? score + 1
+      : score;
+
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion((prev) => prev + 1);
       setPlacements({});
       setShowFeedback(false);
     } else {
+      await saveDragDropProgress(finalScore);
       setGameComplete(true);
     }
   };
@@ -313,6 +365,7 @@ export function DragDropGame() {
     setScore(0);
     setAnsweredCorrectly([]);
     setGameComplete(false);
+    setSavingScore(false);
   };
 
   const allPlaced = currentQ.items.every((item) => placements[item.id]);
@@ -346,7 +399,7 @@ export function DragDropGame() {
                     Excellent Work!
                   </h3>
                   <p className="text-green-600">
-                    You have mastered drag and drop immunity concepts!
+                    Your score has been saved to your student progress.
                   </p>
                 </div>
               )}
@@ -357,7 +410,7 @@ export function DragDropGame() {
                     Good Job!
                   </h3>
                   <p className="text-blue-600">
-                    Keep practicing to improve your understanding!
+                    Your score has been saved to your student progress.
                   </p>
                 </div>
               )}
@@ -368,7 +421,7 @@ export function DragDropGame() {
                     Keep Learning!
                   </h3>
                   <p className="text-orange-600">
-                    Review the lecture notes and try again!
+                    Your score has been saved. Review the notes and try again.
                   </p>
                 </div>
               )}
@@ -379,6 +432,14 @@ export function DragDropGame() {
                   className="bg-blue-600 hover:bg-blue-700 text-white px-8"
                 >
                   Play Again
+                </Button>
+
+                <Button
+                  onClick={() => navigate("/progress")}
+                  variant="outline"
+                  className="px-8"
+                >
+                  View Student Progress
                 </Button>
 
                 <Button
@@ -534,9 +595,12 @@ export function DragDropGame() {
             ) : (
               <Button
                 onClick={handleNext}
+                disabled={savingScore}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8"
               >
-                {currentQuestion < questions.length - 1
+                {savingScore
+                  ? "Saving Score..."
+                  : currentQuestion < questions.length - 1
                   ? "Next Question"
                   : "Finish"}
               </Button>

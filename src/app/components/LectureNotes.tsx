@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 interface LectureContent {
   id: string;
@@ -67,7 +69,7 @@ const lectureTopics: LectureContent[] = [
     ],
     keyPoints: [
       "Receives antibodies from external source",
-      "Can be natural (mother to baby) or artificial",
+      "Can be natural mother to baby or artificial",
       "Provides immediate protection",
       "Protection is temporary",
     ],
@@ -160,8 +162,8 @@ const lectureTopics: LectureContent[] = [
     ],
     keyPoints: [
       "Multiple layers of protection",
-      "Physical barriers (skin, mucous membranes)",
-      "Chemical barriers (acid, enzymes)",
+      "Physical barriers such as skin and mucous membranes",
+      "Chemical barriers such as acid and enzymes",
       "Cellular defenses and inflammation",
     ],
   },
@@ -185,49 +187,199 @@ const lectureTopics: LectureContent[] = [
 
 export function LectureNotes() {
   const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
+  const [completedTopics, setCompletedTopics] = useState<string[]>([]);
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(true);
+
   const currentTopic = lectureTopics[currentTopicIndex];
+
+  const saveLectureProgress = async (
+    topicIndex: number,
+    completedList: string[]
+  ) => {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    const currentLectureTopic = lectureTopics[topicIndex];
+    const lecturePercentage = Math.round(
+      (completedList.length / lectureTopics.length) * 100
+    );
+
+    setSavingProgress(true);
+
+    try {
+      await setDoc(
+        doc(db, "students", user.uid),
+        {
+          name: user.displayName || "Student",
+          email: user.email || "",
+          lectureCompletedTopics: completedList,
+          lectureCompletedCount: completedList.length,
+          lectureTotalTopics: lectureTopics.length,
+          lecturePercentage: lecturePercentage,
+          lastLectureTopic: currentLectureTopic.title,
+          lastActivity: "Lecture Notes",
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("Error saving lecture progress:", error);
+      alert("Failed to save lecture progress.");
+    } finally {
+      setSavingProgress(false);
+    }
+  };
+
+  const loadLectureProgress = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      setLoadingProgress(false);
+      return;
+    }
+
+    try {
+      const studentRef = doc(db, "students", user.uid);
+      const studentSnap = await getDoc(studentRef);
+
+      if (studentSnap.exists()) {
+        const data = studentSnap.data();
+
+        if (Array.isArray(data.lectureCompletedTopics)) {
+          setCompletedTopics(data.lectureCompletedTopics);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading lecture progress:", error);
+    } finally {
+      setLoadingProgress(false);
+    }
+  };
+
+  const markTopicAsRead = async (topicIndex: number) => {
+    const topicId = lectureTopics[topicIndex].id;
+
+    setCompletedTopics((prev) => {
+      const updatedTopics = prev.includes(topicId) ? prev : [...prev, topicId];
+
+      if (!prev.includes(topicId)) {
+        saveLectureProgress(topicIndex, updatedTopics);
+      } else {
+        saveLectureProgress(topicIndex, updatedTopics);
+      }
+
+      return updatedTopics;
+    });
+  };
+
+  useEffect(() => {
+    loadLectureProgress();
+  }, []);
+
+  useEffect(() => {
+    if (!loadingProgress) {
+      markTopicAsRead(currentTopicIndex);
+    }
+  }, [currentTopicIndex, loadingProgress]);
 
   const handlePrevious = () => {
     if (currentTopicIndex > 0) {
-      setCurrentTopicIndex(currentTopicIndex - 1);
+      setCurrentTopicIndex((prev) => prev - 1);
     }
   };
 
   const handleNext = () => {
     if (currentTopicIndex < lectureTopics.length - 1) {
-      setCurrentTopicIndex(currentTopicIndex + 1);
+      setCurrentTopicIndex((prev) => prev + 1);
     }
   };
 
+  const handleSelectTopic = (index: number) => {
+    setCurrentTopicIndex(index);
+  };
+
+  const lectureProgress = Math.round(
+    (completedTopics.length / lectureTopics.length) * 100
+  );
+
+  if (loadingProgress) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        <p className="text-center text-gray-600">
+          Loading lecture progress...
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="mb-6">
+        <h1 className="text-4xl font-bold mb-2">Lecture Notes</h1>
+        <p className="text-gray-600">
+          Read each topic to update your learning progress.
+        </p>
+
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="font-medium text-blue-900">
+              Lecture Progress
+            </span>
+            <span className="font-bold text-blue-700">
+              {lectureProgress}%
+            </span>
+          </div>
+
+          <div className="w-full bg-blue-100 rounded-full h-3">
+            <div
+              className="bg-blue-600 h-3 rounded-full transition-all"
+              style={{ width: `${lectureProgress}%` }}
+            />
+          </div>
+
+          <p className="text-sm text-blue-800 mt-2">
+            Completed {completedTopics.length} of {lectureTopics.length} topics
+            {savingProgress ? " • Saving progress..." : " • Progress saved"}
+          </p>
+        </div>
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-4">
-          <h2 className="text-xl font-bold mb-4">Lecture Notes</h2>
+          <h2 className="text-xl font-bold mb-4">Topics</h2>
 
           <div className="space-y-2">
-            {lectureTopics.map((topic, index) => (
-              <button
-                key={topic.id}
-                onClick={() => setCurrentTopicIndex(index)}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                  currentTopicIndex === index
-                    ? "bg-blue-600 text-white font-medium"
-                    : "hover:bg-gray-100"
-                }`}
-              >
-                {index === 0 && topic.title}
-                {index === 1 && topic.title}
-                {index >= 2 && index <= 3 && (
-                  <span className="pl-4">• {topic.title}</span>
-                )}
-                {index >= 4 && index <= 8 && topic.title}
-                {index >= 5 && index <= 8 && index !== 4 && (
-                  <span className="pl-4">• {topic.title.replace("Immune System Components - ", "")}</span>
-                )}
-                {index >= 9 && topic.title}
-              </button>
-            ))}
+            {lectureTopics.map((topic, index) => {
+              const isCompleted = completedTopics.includes(topic.id);
+
+              return (
+                <button
+                  key={topic.id}
+                  onClick={() => handleSelectTopic(index)}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center justify-between gap-3 ${
+                    currentTopicIndex === index
+                      ? "bg-blue-600 text-white font-medium"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  <span>
+                    {index + 1}. {topic.title}
+                  </span>
+
+                  {isCompleted && (
+                    <CheckCircle
+                      className={`w-5 h-5 flex-shrink-0 ${
+                        currentTopicIndex === index
+                          ? "text-white"
+                          : "text-green-600"
+                      }`}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -235,10 +387,12 @@ export function LectureNotes() {
           <Card className="border-none shadow-lg">
             <CardHeader>
               <CardTitle className="text-3xl">{currentTopic.title}</CardTitle>
+
               <div className="text-sm text-gray-500">
                 Topic {currentTopicIndex + 1} of {lectureTopics.length}
               </div>
             </CardHeader>
+
             <CardContent className="space-y-6">
               {currentTopic.content.map((paragraph, index) => (
                 <p key={index} className="text-gray-700 leading-relaxed">
@@ -253,15 +407,19 @@ export function LectureNotes() {
                       <div className="w-16 h-20 bg-blue-400 rounded-full"></div>
                     </div>
                   </div>
+
                   <div className="absolute top-8 left-16 w-8 h-8">
                     <div className="w-full h-full bg-purple-400 rounded-full animate-pulse"></div>
                   </div>
+
                   <div className="absolute top-12 right-20 w-6 h-6">
                     <div className="w-full h-full bg-pink-400 rounded-full animate-pulse"></div>
                   </div>
+
                   <div className="absolute bottom-16 left-24 w-7 h-7">
                     <div className="w-full h-full bg-blue-300 rounded-full animate-pulse"></div>
                   </div>
+
                   <div className="absolute bottom-12 right-16 w-5 h-5">
                     <div className="w-full h-full bg-purple-300 rounded-full animate-pulse"></div>
                   </div>
@@ -270,6 +428,7 @@ export function LectureNotes() {
 
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Key Points</h3>
+
                 <div className="space-y-2">
                   {currentTopic.keyPoints.map((point, index) => (
                     <div key={index} className="flex items-start gap-2">
@@ -290,6 +449,7 @@ export function LectureNotes() {
                   <ChevronLeft className="w-4 h-4" />
                   Previous
                 </Button>
+
                 <Button
                   className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
                   onClick={handleNext}
