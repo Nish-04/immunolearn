@@ -1,10 +1,15 @@
-import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "./ui/button";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Label } from "./ui/label";
 import { Progress } from "./ui/progress";
-import { CheckCircle, XCircle, Clock } from "lucide-react";
+import {
+  Award,
+  CheckCircle,
+  Clock,
+  RotateCcw,
+  Sparkles,
+  Trophy,
+  XCircle,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -13,7 +18,10 @@ import { useLanguage } from "../context/LanguageContext";
 interface Question {
   id: number;
   question: string;
-  options: { id: string; text: string }[];
+  options: {
+    id: string;
+    text: string;
+  }[];
   correctAnswer: string;
   explanation: string;
 }
@@ -31,7 +39,8 @@ const englishQuestions: Question[] = [
       { id: "D", text: "T-lymphocytes" },
     ],
     correctAnswer: "B",
-    explanation: "White blood cells are a key component of the innate immune system.",
+    explanation:
+      "White blood cells are a key component of the innate immune system.",
   },
   {
     id: 2,
@@ -43,7 +52,8 @@ const englishQuestions: Question[] = [
       { id: "D", text: "Digest food particles" },
     ],
     correctAnswer: "B",
-    explanation: "Antibodies identify and neutralize foreign objects like bacteria and viruses.",
+    explanation:
+      "Antibodies identify and neutralize foreign objects like bacteria and viruses.",
   },
   {
     id: 3,
@@ -56,7 +66,7 @@ const englishQuestions: Question[] = [
     ],
     correctAnswer: "B",
     explanation:
-      "Vaccination provides active artificial immunity by introducing antigens to stimulate immune response.",
+      "Vaccination provides active artificial immunity by introducing antigens to stimulate an immune response.",
   },
   {
     id: 4,
@@ -76,7 +86,7 @@ const englishQuestions: Question[] = [
     question: "What is the role of memory cells in the immune system?",
     options: [
       { id: "A", text: "Store nutrients for future use" },
-      { id: "B", text: "Remember previous infections for faster response" },
+      { id: "B", text: "Remember previous infections for a faster response" },
       { id: "C", text: "Create new blood cells" },
       { id: "D", text: "Filter waste from blood" },
     ],
@@ -108,7 +118,7 @@ const englishQuestions: Question[] = [
     ],
     correctAnswer: "A",
     explanation:
-      "An antigen is any substance that causes the immune system to produce antibodies against it.",
+      "An antigen is a substance that triggers an immune response.",
   },
   {
     id: 8,
@@ -125,7 +135,8 @@ const englishQuestions: Question[] = [
   },
   {
     id: 9,
-    question: "What type of immunity do babies receive from their mothers during breastfeeding?",
+    question:
+      "What type of immunity do babies receive from their mothers during breastfeeding?",
     options: [
       { id: "A", text: "Active natural immunity" },
       { id: "B", text: "Active artificial immunity" },
@@ -134,11 +145,12 @@ const englishQuestions: Question[] = [
     ],
     correctAnswer: "C",
     explanation:
-      "Babies receive passive natural immunity through antibodies in breast milk from their mothers.",
+      "Babies receive passive natural immunity through antibodies in breast milk.",
   },
   {
     id: 10,
-    question: "Which of the following is NOT a physical barrier of the immune system?",
+    question:
+      "Which of the following is NOT a physical barrier of the immune system?",
     options: [
       { id: "A", text: "Skin" },
       { id: "B", text: "Mucus membranes" },
@@ -147,14 +159,15 @@ const englishQuestions: Question[] = [
     ],
     correctAnswer: "C",
     explanation:
-      "Antibodies are part of the adaptive immune response, not a physical barrier. Skin, mucus, and stomach acid are physical/chemical barriers.",
+      "Antibodies are part of the adaptive immune response, not a physical barrier.",
   },
 ];
 
 const malayQuestions: Question[] = [
   {
     id: 1,
-    question: "Antara berikut, yang manakah sebahagian daripada sistem imun semula jadi?",
+    question:
+      "Antara berikut, yang manakah sebahagian daripada sistem imun semula jadi?",
     options: [
       { id: "A", text: "Antibodi" },
       { id: "B", text: "Sel Darah Putih" },
@@ -162,7 +175,8 @@ const malayQuestions: Question[] = [
       { id: "D", text: "T-limfosit" },
     ],
     correctAnswer: "B",
-    explanation: "Sel darah putih ialah komponen penting dalam sistem imun semula jadi.",
+    explanation:
+      "Sel darah putih ialah komponen penting dalam sistem imun semula jadi.",
   },
   {
     id: 2,
@@ -174,7 +188,8 @@ const malayQuestions: Question[] = [
       { id: "D", text: "Mencerna zarah makanan" },
     ],
     correctAnswer: "B",
-    explanation: "Antibodi mengenal pasti dan meneutralkan objek asing seperti bakteria dan virus.",
+    explanation:
+      "Antibodi mengenal pasti dan meneutralkan objek asing seperti bakteria dan virus.",
   },
   {
     id: 3,
@@ -207,7 +222,10 @@ const malayQuestions: Question[] = [
     question: "Apakah peranan sel memori dalam sistem imun?",
     options: [
       { id: "A", text: "Menyimpan nutrien untuk kegunaan masa depan" },
-      { id: "B", text: "Mengingati jangkitan terdahulu untuk tindak balas lebih cepat" },
+      {
+        id: "B",
+        text: "Mengingati jangkitan terdahulu untuk tindak balas lebih cepat",
+      },
       { id: "C", text: "Mencipta sel darah baharu" },
       { id: "D", text: "Menapis bahan buangan daripada darah" },
     ],
@@ -239,7 +257,7 @@ const malayQuestions: Question[] = [
     ],
     correctAnswer: "A",
     explanation:
-      "Antigen ialah bahan yang menyebabkan sistem imun menghasilkan antibodi terhadapnya.",
+      "Antigen ialah bahan yang mencetuskan tindak balas imun.",
   },
   {
     id: 8,
@@ -256,7 +274,8 @@ const malayQuestions: Question[] = [
   },
   {
     id: 9,
-    question: "Apakah jenis imuniti yang bayi terima daripada ibu melalui penyusuan?",
+    question:
+      "Apakah jenis imuniti yang bayi terima daripada ibu melalui penyusuan?",
     options: [
       { id: "A", text: "Imuniti aktif semula jadi" },
       { id: "B", text: "Imuniti aktif buatan" },
@@ -269,7 +288,8 @@ const malayQuestions: Question[] = [
   },
   {
     id: 10,
-    question: "Antara berikut, yang manakah BUKAN halangan fizikal sistem imun?",
+    question:
+      "Antara berikut, yang manakah BUKAN halangan fizikal sistem imun?",
     options: [
       { id: "A", text: "Kulit" },
       { id: "B", text: "Membran mukus" },
@@ -295,7 +315,7 @@ export function QuizAssessment() {
 
   const text = {
     en: {
-      quickQuiz: "Quick Quiz",
+      quickQuiz: "Quiz Challenge",
       question: "Question",
       of: "of",
       score: "Score",
@@ -305,7 +325,10 @@ export function QuizAssessment() {
       savingScore: "Saving Score...",
       correct: "Correct!",
       incorrect: "Incorrect",
-      quizComplete: "Quiz Complete! 🎉",
+      quizComplete: "Quiz Complete!",
+      timeExpired: "Time is up!",
+      timeExpiredMessage:
+        "Your current score has been saved. You can retake the quiz to improve your result.",
       youScored: "You scored",
       outOf: "out of",
       excellentWork: "Excellent Work!",
@@ -313,7 +336,8 @@ export function QuizAssessment() {
       keepLearning: "Keep Learning!",
       savedExcellent: "Your quiz score has been saved to your student progress.",
       savedGood: "Your quiz score has been saved to your student progress.",
-      savedLow: "Your quiz score has been saved. Review the lecture notes and try again.",
+      savedLow:
+        "Your quiz score has been saved. Review the lecture notes and try again.",
       retakeQuiz: "Retake Quiz",
       viewProgress: "View Student Progress",
       userNotLoggedIn: "User not logged in. Quiz score cannot be saved.",
@@ -321,9 +345,11 @@ export function QuizAssessment() {
         "Failed to save quiz score. Please check your Firebase Firestore settings.",
       student: "Student",
       lastActivity: "Quiz Assessment",
+      timer: "Time",
     },
+
     ms: {
-      quickQuiz: "Kuiz Pantas",
+      quickQuiz: "Cabaran Kuiz",
       question: "Soalan",
       of: "daripada",
       score: "Markah",
@@ -333,7 +359,10 @@ export function QuizAssessment() {
       savingScore: "Menyimpan Markah...",
       correct: "Betul!",
       incorrect: "Salah",
-      quizComplete: "Kuiz Selesai! 🎉",
+      quizComplete: "Kuiz Selesai!",
+      timeExpired: "Masa sudah tamat!",
+      timeExpiredMessage:
+        "Markah semasa anda telah disimpan. Anda boleh cuba semula untuk meningkatkan keputusan.",
       youScored: "Anda mendapat markah",
       outOf: "daripada",
       excellentWork: "Sangat Bagus!",
@@ -341,17 +370,21 @@ export function QuizAssessment() {
       keepLearning: "Teruskan Belajar!",
       savedExcellent: "Markah kuiz anda telah disimpan dalam kemajuan pelajar.",
       savedGood: "Markah kuiz anda telah disimpan dalam kemajuan pelajar.",
-      savedLow: "Markah kuiz anda telah disimpan. Baca semula nota kuliah dan cuba lagi.",
+      savedLow:
+        "Markah kuiz anda telah disimpan. Baca semula nota kuliah dan cuba lagi.",
       retakeQuiz: "Ambil Semula Kuiz",
       viewProgress: "Lihat Kemajuan Pelajar",
-      userNotLoggedIn: "Pengguna belum log masuk. Markah kuiz tidak dapat disimpan.",
+      userNotLoggedIn:
+        "Pengguna belum log masuk. Markah kuiz tidak dapat disimpan.",
       failedSave:
         "Gagal menyimpan markah kuiz. Sila semak tetapan Firebase Firestore.",
       student: "Pelajar",
       lastActivity: "Kuiz dan Penilaian",
+      timer: "Masa",
     },
+
     zh: {
-      quickQuiz: "快速测验",
+      quickQuiz: "测验挑战",
       question: "问题",
       of: "共",
       score: "分数",
@@ -361,7 +394,9 @@ export function QuizAssessment() {
       savingScore: "正在保存分数...",
       correct: "正确！",
       incorrect: "错误",
-      quizComplete: "测验完成！🎉",
+      quizComplete: "测验完成！",
+      timeExpired: "时间到了！",
+      timeExpiredMessage: "当前分数已保存。你可以重新测验以提高成绩。",
       youScored: "你的得分是",
       outOf: "共",
       excellentWork: "非常棒！",
@@ -376,9 +411,11 @@ export function QuizAssessment() {
       failedSave: "保存测验分数失败。请检查 Firebase Firestore 设置。",
       student: "学生",
       lastActivity: "测验与评估",
+      timer: "时间",
     },
+
     ar: {
-      quickQuiz: "اختبار سريع",
+      quickQuiz: "تحدي الاختبار",
       question: "السؤال",
       of: "من",
       score: "الدرجة",
@@ -388,7 +425,10 @@ export function QuizAssessment() {
       savingScore: "جارٍ حفظ الدرجة...",
       correct: "صحيح!",
       incorrect: "خطأ",
-      quizComplete: "اكتمل الاختبار! 🎉",
+      quizComplete: "اكتمل الاختبار!",
+      timeExpired: "انتهى الوقت!",
+      timeExpiredMessage:
+        "تم حفظ درجتك الحالية. يمكنك إعادة الاختبار لتحسين النتيجة.",
       youScored: "حصلت على",
       outOf: "من",
       excellentWork: "عمل ممتاز!",
@@ -396,24 +436,27 @@ export function QuizAssessment() {
       keepLearning: "استمر في التعلم!",
       savedExcellent: "تم حفظ درجة الاختبار في تقدم الطالب.",
       savedGood: "تم حفظ درجة الاختبار في تقدم الطالب.",
-      savedLow: "تم حفظ درجة الاختبار. راجع ملاحظات المحاضرة وحاول مرة أخرى.",
+      savedLow:
+        "تم حفظ درجة الاختبار. راجع ملاحظات المحاضرة وحاول مرة أخرى.",
       retakeQuiz: "إعادة الاختبار",
       viewProgress: "عرض تقدم الطالب",
       userNotLoggedIn: "المستخدم غير مسجل الدخول. لا يمكن حفظ درجة الاختبار.",
       failedSave: "فشل حفظ درجة الاختبار. تحقق من إعدادات Firebase Firestore.",
       student: "طالب",
       lastActivity: "الاختبار والتقييم",
+      timer: "الوقت",
     },
   };
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string>("");
+  const [selectedAnswer, setSelectedAnswer] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [score, setScore] = useState(0);
   const [answeredQuestions, setAnsweredQuestions] = useState<number[]>([]);
   const [quizComplete, setQuizComplete] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(600);
   const [savingScore, setSavingScore] = useState(false);
+  const [timeExpired, setTimeExpired] = useState(false);
 
   const currentText = text[language];
   const quizQuestions = quizQuestionsByLanguage[language];
@@ -426,6 +469,7 @@ export function QuizAssessment() {
     if (percentage >= 80) return "Excellent";
     if (percentage >= 60) return "Good";
     if (percentage > 0) return "Needs Improvement";
+
     return "No activity yet";
   };
 
@@ -465,34 +509,69 @@ export function QuizAssessment() {
     }
   };
 
+  useEffect(() => {
+    if (quizComplete) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setTimeRemaining((previousTime) => {
+        if (previousTime <= 1) {
+          return 0;
+        }
+
+        return previousTime - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [quizComplete]);
+
+  useEffect(() => {
+    if (timeRemaining !== 0 || quizComplete) {
+      return;
+    }
+
+    const finishQuizBecauseTimeExpired = async () => {
+      setTimeExpired(true);
+      await saveQuizProgress(score);
+      setQuizComplete(true);
+    };
+
+    void finishQuizBecauseTimeExpired();
+  }, [timeRemaining, quizComplete, score]);
+
   const handleSubmit = () => {
+    if (!selectedAnswer) {
+      return;
+    }
+
     setShowFeedback(true);
 
     if (
       selectedAnswer === currentQ.correctAnswer &&
       !answeredQuestions.includes(currentQuestion)
     ) {
-      setScore((prev) => prev + 1);
-      setAnsweredQuestions((prev) => [...prev, currentQuestion]);
+      setScore((previousScore) => previousScore + 1);
+
+      setAnsweredQuestions((previousAnswers) => [
+        ...previousAnswers,
+        currentQuestion,
+      ]);
     }
   };
 
   const handleNext = async () => {
-    const finalScore = answeredQuestions.includes(currentQuestion)
-      ? score
-      : selectedAnswer === currentQ.correctAnswer
-      ? score + 1
-      : score;
-
     if (currentQuestion < quizQuestions.length - 1) {
-      setCurrentQuestion((prev) => prev + 1);
+      setCurrentQuestion((previousQuestion) => previousQuestion + 1);
       setSelectedAnswer("");
       setShowFeedback(false);
-    } else {
-      await saveQuizProgress(finalScore);
-      setScore(finalScore);
-      setQuizComplete(true);
+
+      return;
     }
+
+    await saveQuizProgress(score);
+    setQuizComplete(true);
   };
 
   const handleRestart = () => {
@@ -504,13 +583,14 @@ export function QuizAssessment() {
     setQuizComplete(false);
     setTimeRemaining(600);
     setSavingScore(false);
+    setTimeExpired(false);
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
 
-    return `${mins.toString().padStart(2, "0")}:${secs
+    return `${minutes.toString().padStart(2, "0")}:${remainingSeconds
       .toString()
       .padStart(2, "0")}`;
   };
@@ -519,244 +599,361 @@ export function QuizAssessment() {
     const percentage = Math.round((score / quizQuestions.length) * 100);
 
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-3xl text-center">
-              {currentText.quizComplete}
-            </CardTitle>
-          </CardHeader>
+      <QuizBackground>
+        <div className="max-w-5xl mx-auto px-6 py-10">
+          <div className="bg-white/95 backdrop-blur rounded-[2rem] shadow-2xl border border-white overflow-hidden">
+            <div className="h-3 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
 
-          <CardContent className="space-y-6">
-            <div className="text-center">
-              <div className="text-6xl font-bold text-blue-600 mb-2">
-                {percentage}%
+            <div className="p-8 text-center">
+              <div className="w-24 h-24 mx-auto rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center mb-5 animate-bounce">
+                <Trophy className="w-14 h-14" />
               </div>
 
-              <p className="text-xl text-gray-600 mb-4">
+              <h1 className="text-4xl font-extrabold text-gray-900 mb-2">
+                {timeExpired
+                  ? currentText.timeExpired
+                  : currentText.quizComplete}
+              </h1>
+
+              {timeExpired && (
+                <p className="text-orange-700 font-semibold mb-4">
+                  {currentText.timeExpiredMessage}
+                </p>
+              )}
+
+              <p className="text-gray-600 mb-6">
                 {currentText.youScored} {score} {currentText.outOf}{" "}
                 {quizQuestions.length}
               </p>
 
-              <div className="w-full max-w-md mx-auto mb-6">
+              <div className="text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-6">
+                {percentage}%
+              </div>
+
+              <div className="max-w-xl mx-auto mb-6">
                 <Progress value={percentage} className="h-4" />
               </div>
 
-              {percentage >= 80 && (
-                <div className="bg-green-50 border-2 border-green-600 rounded-lg p-6 mb-4">
-                  <h3 className="text-2xl font-bold text-green-700 mb-2">
-                    {currentText.excellentWork}
-                  </h3>
-                  <p className="text-green-600">
-                    {currentText.savedExcellent}
-                  </p>
-                </div>
-              )}
+              <div
+                className={`rounded-3xl p-6 mb-6 border-2 ${
+                  percentage >= 80
+                    ? "bg-green-50 border-green-300"
+                    : percentage >= 60
+                    ? "bg-blue-50 border-blue-300"
+                    : "bg-orange-50 border-orange-300"
+                }`}
+              >
+                <h2
+                  className={`text-2xl font-extrabold mb-2 ${
+                    percentage >= 80
+                      ? "text-green-700"
+                      : percentage >= 60
+                      ? "text-blue-700"
+                      : "text-orange-700"
+                  }`}
+                >
+                  {percentage >= 80
+                    ? currentText.excellentWork
+                    : percentage >= 60
+                    ? currentText.goodJob
+                    : currentText.keepLearning}
+                </h2>
 
-              {percentage >= 60 && percentage < 80 && (
-                <div className="bg-blue-50 border-2 border-blue-600 rounded-lg p-6 mb-4">
-                  <h3 className="text-2xl font-bold text-blue-700 mb-2">
-                    {currentText.goodJob}
-                  </h3>
-                  <p className="text-blue-600">{currentText.savedGood}</p>
-                </div>
-              )}
-
-              {percentage < 60 && (
-                <div className="bg-orange-50 border-2 border-orange-600 rounded-lg p-6 mb-4">
-                  <h3 className="text-2xl font-bold text-orange-700 mb-2">
-                    {currentText.keepLearning}
-                  </h3>
-                  <p className="text-orange-600">{currentText.savedLow}</p>
-                </div>
-              )}
+                <p
+                  className={
+                    percentage >= 80
+                      ? "text-green-700"
+                      : percentage >= 60
+                      ? "text-blue-700"
+                      : "text-orange-700"
+                  }
+                >
+                  {percentage >= 80
+                    ? currentText.savedExcellent
+                    : percentage >= 60
+                    ? currentText.savedGood
+                    : currentText.savedLow}
+                </p>
+              </div>
 
               <div className="flex justify-center gap-4 flex-wrap">
                 <Button
+                  type="button"
                   onClick={handleRestart}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 rounded-xl"
                 >
+                  <RotateCcw className="w-5 h-5 mr-2" />
                   {currentText.retakeQuiz}
                 </Button>
 
                 <Button
+                  type="button"
                   onClick={() => navigate("/progress")}
                   variant="outline"
-                  className="px-8"
+                  className="px-8 py-6 rounded-xl bg-white"
                 >
+                  <Award className="w-5 h-5 mr-2" />
                   {currentText.viewProgress}
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </QuizBackground>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <Card className="border-none shadow-lg">
-        <CardHeader>
-          <div className="flex justify-between items-center mb-4">
-            <CardTitle className="text-2xl">{currentText.quickQuiz}</CardTitle>
-
-            <div className="flex items-center gap-2 text-blue-600">
-              <Clock className="w-5 h-5" />
-              <span className="font-mono">{formatTime(timeRemaining)}</span>
-            </div>
+    <QuizBackground>
+      <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="mb-6 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-purple-200 px-4 py-2 text-sm font-bold text-purple-700 shadow-md mb-3">
+            <Sparkles className="w-4 h-4" />
+            Immunity Quiz Time
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">
-                {currentText.question} {currentQuestion + 1} {currentText.of}{" "}
-                {quizQuestions.length}
-              </span>
+          <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 drop-shadow-sm">
+            {currentText.quickQuiz}
+          </h1>
+        </div>
 
-              <span className="text-blue-600 font-medium">
-                {currentText.score}: {score}/{quizQuestions.length}
-              </span>
-            </div>
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <StatCard
+            label={currentText.score}
+            value={`${score}/${quizQuestions.length}`}
+            color="blue"
+          />
 
-            <Progress value={progress} className="h-2" />
-          </div>
-        </CardHeader>
+          <StatCard
+            label={`${currentText.question} ${currentQuestion + 1}`}
+            value={`${currentQuestion + 1}/${quizQuestions.length}`}
+            color="purple"
+          />
 
-        <CardContent className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-6">
-              {currentQ.question}
-            </h3>
-
-            <RadioGroup
-              value={selectedAnswer}
-              onValueChange={setSelectedAnswer}
-              disabled={showFeedback}
+          <div className="bg-white/95 rounded-3xl p-4 shadow-xl border border-white flex items-center justify-center gap-3">
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                timeRemaining <= 60
+                  ? "bg-red-100 text-red-600 animate-pulse"
+                  : "bg-pink-100 text-pink-600"
+              }`}
             >
-              <div className="space-y-3">
-                {currentQ.options.map((option) => {
-                  const isCorrect = option.id === currentQ.correctAnswer;
-                  const isSelected = selectedAnswer === option.id;
+              <Clock className="w-6 h-6" />
+            </div>
 
-                  let borderColor = "border-gray-200";
-                  let bgColor = "";
+            <div>
+              <p className="text-sm font-bold text-gray-500">
+                {currentText.timer}
+              </p>
 
-                  if (showFeedback) {
-                    if (isCorrect) {
-                      borderColor = "border-green-600";
-                      bgColor = "bg-green-50";
-                    } else if (isSelected && !isCorrect) {
-                      borderColor = "border-red-600";
-                      bgColor = "bg-red-50";
-                    }
-                  } else if (isSelected) {
-                    borderColor = "border-blue-600";
-                    bgColor = "bg-blue-50";
+              <p
+                className={`text-2xl font-extrabold ${
+                  timeRemaining <= 60 ? "text-red-600" : "text-pink-600"
+                }`}
+              >
+                {formatTime(timeRemaining)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/95 backdrop-blur rounded-[2rem] shadow-2xl border border-white overflow-hidden">
+          <div className="h-3 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+
+          <div className="p-6 md:p-8">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm font-bold text-gray-600 mb-2">
+                <span>
+                  {currentText.question} {currentQuestion + 1} {currentText.of}{" "}
+                  {quizQuestions.length}
+                </span>
+
+                <span>{Math.round(progress)}%</span>
+              </div>
+
+              <Progress value={progress} className="h-3" />
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl p-6 border border-blue-100 mb-6">
+              <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 leading-relaxed">
+                {currentQ.question}
+              </h2>
+            </div>
+
+            <div className="grid gap-4">
+              {currentQ.options.map((option) => {
+                const isCorrect = option.id === currentQ.correctAnswer;
+                const isSelected = selectedAnswer === option.id;
+
+                let buttonStyle =
+                  "bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50";
+
+                if (showFeedback) {
+                  if (isCorrect) {
+                    buttonStyle = "bg-green-50 border-green-500";
+                  } else if (isSelected && !isCorrect) {
+                    buttonStyle = "bg-red-50 border-red-500";
                   }
+                } else if (isSelected) {
+                  buttonStyle = "bg-blue-50 border-blue-500 shadow-lg";
+                }
 
-                  return (
-                    <div
-                      key={option.id}
-                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-colors ${borderColor} ${bgColor}`}
-                    >
-                      <RadioGroupItem
-                        value={option.id}
-                        id={option.id}
-                        className="mt-0.5"
-                      />
-
-                      <Label
-                        htmlFor={option.id}
-                        className="flex-1 cursor-pointer"
+                return (
+                  <button
+                    type="button"
+                    key={option.id}
+                    disabled={showFeedback}
+                    onClick={() => setSelectedAnswer(option.id)}
+                    className={`w-full text-left rounded-2xl border-2 p-4 transition-all hover:-translate-y-1 hover:shadow-lg ${buttonStyle}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center font-extrabold ${
+                          showFeedback && isCorrect
+                            ? "bg-green-500 text-white"
+                            : showFeedback && isSelected && !isCorrect
+                            ? "bg-red-500 text-white"
+                            : isSelected
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
                       >
-                        <span className="font-medium mr-2">
-                          {option.id}.
-                        </span>
+                        {option.id}
+                      </div>
+
+                      <p className="flex-1 font-semibold text-gray-800">
                         {option.text}
-                      </Label>
+                      </p>
 
                       {showFeedback && isCorrect && (
-                        <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                        <CheckCircle className="w-6 h-6 text-green-600" />
                       )}
 
                       {showFeedback && isSelected && !isCorrect && (
-                        <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                        <XCircle className="w-6 h-6 text-red-600" />
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </RadioGroup>
-          </div>
+                  </button>
+                );
+              })}
+            </div>
 
-          {showFeedback && (
-            <div
-              className={`border-2 rounded-lg p-4 ${
-                selectedAnswer === currentQ.correctAnswer
-                  ? "bg-green-50 border-green-600"
-                  : "bg-red-50 border-red-600"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                {selectedAnswer === currentQ.correctAnswer ? (
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-                )}
+            {showFeedback && (
+              <div
+                className={`mt-6 rounded-3xl p-5 border-2 ${
+                  selectedAnswer === currentQ.correctAnswer
+                    ? "bg-green-50 border-green-400"
+                    : "bg-red-50 border-red-400"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {selectedAnswer === currentQ.correctAnswer ? (
+                    <CheckCircle className="w-7 h-7 text-green-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="w-7 h-7 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
 
-                <div>
-                  <h4
-                    className={`font-semibold mb-1 ${
-                      selectedAnswer === currentQ.correctAnswer
-                        ? "text-green-900"
-                        : "text-red-900"
-                    }`}
-                  >
-                    {selectedAnswer === currentQ.correctAnswer
-                      ? currentText.correct
-                      : currentText.incorrect}
-                  </h4>
+                  <div>
+                    <h3
+                      className={`font-extrabold text-lg mb-1 ${
+                        selectedAnswer === currentQ.correctAnswer
+                          ? "text-green-800"
+                          : "text-red-800"
+                      }`}
+                    >
+                      {selectedAnswer === currentQ.correctAnswer
+                        ? currentText.correct
+                        : currentText.incorrect}
+                    </h3>
 
-                  <p
-                    className={`text-sm ${
-                      selectedAnswer === currentQ.correctAnswer
-                        ? "text-green-800"
-                        : "text-red-800"
-                    }`}
-                  >
-                    {currentQ.explanation}
-                  </p>
+                    <p
+                      className={`text-sm ${
+                        selectedAnswer === currentQ.correctAnswer
+                          ? "text-green-700"
+                          : "text-red-700"
+                      }`}
+                    >
+                      {currentQ.explanation}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          <div className="flex justify-end">
-            {!showFeedback ? (
-              <Button
-                onClick={handleSubmit}
-                disabled={!selectedAnswer}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-              >
-                {currentText.submitAnswer}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleNext}
-                disabled={savingScore}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-              >
-                {savingScore
-                  ? currentText.savingScore
-                  : currentQuestion < quizQuestions.length - 1
-                  ? currentText.nextQuestion
-                  : currentText.finishQuiz}
-              </Button>
             )}
+
+            <div className="flex justify-end mt-6">
+              {!showFeedback ? (
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!selectedAnswer}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 rounded-xl"
+                >
+                  {currentText.submitAnswer}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={savingScore}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-6 rounded-xl"
+                >
+                  {savingScore
+                    ? currentText.savingScore
+                    : currentQuestion < quizQuestions.length - 1
+                    ? currentText.nextQuestion
+                    : currentText.finishQuiz}
+                </Button>
+              )}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+    </QuizBackground>
+  );
+}
+
+function QuizBackground({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{
+        backgroundImage: "url('/images/backgrounds/quiz-bg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      <div className="absolute inset-0 bg-white/35 backdrop-blur-[2px]"></div>
+
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: "blue" | "purple";
+}) {
+  const colorClass =
+    color === "blue"
+      ? "bg-blue-100 text-blue-600"
+      : "bg-purple-100 text-purple-600";
+
+  return (
+    <div className="bg-white/95 rounded-3xl p-4 shadow-xl border border-white text-center">
+      <div
+        className={`w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center ${colorClass}`}
+      >
+        <Sparkles className="w-6 h-6" />
+      </div>
+
+      <p className="text-sm font-bold text-gray-500">{label}</p>
+      <p className="text-2xl font-extrabold text-gray-900">{value}</p>
     </div>
   );
 }
