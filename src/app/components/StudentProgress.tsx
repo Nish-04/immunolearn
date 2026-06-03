@@ -1,22 +1,27 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
 import {
-  Trophy,
-  Award,
-  Medal,
-  CheckCircle,
-  User,
-  RefreshCw,
   Activity,
+  AlertCircle,
+  Award,
   BookOpen,
-  Gamepad2,
+  Brain,
+  CheckCircle,
   FileQuestion,
+  Gamepad2,
+  Medal,
+  RefreshCw,
+  ShieldCheck,
+  Timer,
+  Trophy,
+  User,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useLanguage } from "../context/LanguageContext";
+import type { LucideIcon } from "lucide-react";
 
 interface StudentData {
   name?: string;
@@ -33,17 +38,36 @@ interface StudentData {
   dragDropPercentage?: number;
   dragDropPerformance?: string;
 
+  immuneMatchCompleted?: boolean;
+  immuneMatchMoves?: number;
+  immuneMatchTimeSeconds?: number;
+
+  defenseLabCompleted?: boolean;
+  defenseLabScore?: number;
+  defenseLabMistakes?: number;
+
   quizScore?: number;
   quizTotal?: number;
   quizPercentage?: number;
   quizPerformance?: string;
 
+  completedActivities?: string[];
   lastActivity?: string;
 }
+
+type SummaryItem = {
+  title: string;
+  percentage: number;
+  scoreText: string;
+  description: string;
+  icon: LucideIcon;
+  iconStyle: string;
+};
 
 export function StudentProgress() {
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [loading, setLoading] = useState(true);
+
   const { language } = useLanguage();
 
   const text = {
@@ -52,7 +76,7 @@ export function StudentProgress() {
       failedLoad: "Failed to load student progress.",
       pageTitle: "Your Learning Progress",
       pageSubtitle:
-        "Track your lecture notes, quiz score, drag and drop score, and overall student performance.",
+        "Track your lecture notes, game activities, quiz score, and overall learning performance.",
       refresh: "Refresh Progress",
       overall: "Overall",
       overallProgress: "Overall Progress",
@@ -69,25 +93,33 @@ export function StudentProgress() {
       lastLectureTopic: "Last Lecture Topic",
       performanceSummary: "Performance Summary",
       completed: "Completed",
+      notCompleted: "Not Completed",
       of: "of",
       performance: "Performance",
-      dragDropActivity: "Drag and Drop Activity",
-      quizAssessment: "Quiz Assessment",
-      chapterProgress: "Chapter Progress",
+      score: "Score",
+      moves: "Moves",
+      time: "Time",
+      mistakes: "Mistakes",
+      chapterProgress: "Lecture Topic Progress",
       recentAchievements: "Recent Achievements",
+      dragDropActivity: "Drag & Drop Game",
+      immuneMatch: "Immune Match",
+      defenseLab: "Defense Lab Mission",
+      quizAssessment: "Quiz Assessment",
       introduction: "Introduction to Immunity",
       types: "Types of Immunity",
-      components: "Immune System Components",
-      defense: "Body Defense Mechanisms",
+      pathogens: "Pathogens",
+      whiteBloodCells: "White Blood Cells",
       vaccination: "Vaccination",
       startedLecture: "Started Lecture Notes",
-      completedDrag: "Completed Drag and Drop Activity",
+      completedDrag: "Completed Drag & Drop Game",
+      completedImmuneMatch: "Completed Immune Match",
+      completedDefenseLab: "Completed Defense Lab Mission",
       completedQuiz: "Completed Quiz Assessment",
       earnedExcellent: "Earned Excellent Performance Badge",
       overallReached: "Overall progress reached",
-      score: "Score",
       noAchievements:
-        "No achievements yet. Read lecture notes or complete an activity to unlock badges.",
+        "No achievements yet. Read the lecture notes or complete an activity to unlock badges.",
       noActivity: "No activity yet",
       noLecture: "No lecture viewed yet",
       student: "Student",
@@ -95,6 +127,8 @@ export function StudentProgress() {
       excellent: "Excellent",
       good: "Good",
       needsImprovement: "Needs Improvement",
+      activityProgress: "Activity Progress",
+      fiveLearningSections: "Five learning sections",
     },
 
     ms: {
@@ -102,7 +136,7 @@ export function StudentProgress() {
       failedLoad: "Gagal memuatkan kemajuan pelajar.",
       pageTitle: "Kemajuan Pembelajaran Anda",
       pageSubtitle:
-        "Pantau nota kuliah, markah kuiz, markah drag and drop, dan prestasi keseluruhan pelajar.",
+        "Pantau nota kuliah, aktiviti permainan, markah kuiz dan prestasi pembelajaran keseluruhan.",
       refresh: "Segar Semula Kemajuan",
       overall: "Keseluruhan",
       overallProgress: "Kemajuan Keseluruhan",
@@ -119,23 +153,31 @@ export function StudentProgress() {
       lastLectureTopic: "Topik Kuliah Terakhir",
       performanceSummary: "Ringkasan Prestasi",
       completed: "Selesai",
+      notCompleted: "Belum Selesai",
       of: "daripada",
       performance: "Prestasi",
-      dragDropActivity: "Aktiviti Seret dan Lepas",
-      quizAssessment: "Kuiz dan Penilaian",
-      chapterProgress: "Kemajuan Bab",
+      score: "Markah",
+      moves: "Gerakan",
+      time: "Masa",
+      mistakes: "Kesalahan",
+      chapterProgress: "Kemajuan Topik Kuliah",
       recentAchievements: "Pencapaian Terkini",
+      dragDropActivity: "Permainan Seret dan Lepas",
+      immuneMatch: "Immune Match",
+      defenseLab: "Defense Lab Mission",
+      quizAssessment: "Kuiz dan Penilaian",
       introduction: "Pengenalan kepada Imuniti",
       types: "Jenis Imuniti",
-      components: "Komponen Sistem Imun",
-      defense: "Mekanisme Pertahanan Badan",
+      pathogens: "Patogen",
+      whiteBloodCells: "Sel Darah Putih",
       vaccination: "Vaksinasi",
       startedLecture: "Memulakan Nota Kuliah",
-      completedDrag: "Menyelesaikan Aktiviti Seret dan Lepas",
+      completedDrag: "Menyelesaikan Permainan Seret dan Lepas",
+      completedImmuneMatch: "Menyelesaikan Immune Match",
+      completedDefenseLab: "Menyelesaikan Defense Lab Mission",
       completedQuiz: "Menyelesaikan Kuiz dan Penilaian",
       earnedExcellent: "Mendapat Lencana Prestasi Cemerlang",
       overallReached: "Kemajuan keseluruhan mencapai",
-      score: "Markah",
       noAchievements:
         "Belum ada pencapaian. Baca nota kuliah atau selesaikan aktiviti untuk membuka lencana.",
       noActivity: "Belum ada aktiviti",
@@ -145,13 +187,15 @@ export function StudentProgress() {
       excellent: "Cemerlang",
       good: "Baik",
       needsImprovement: "Perlu Penambahbaikan",
+      activityProgress: "Kemajuan Aktiviti",
+      fiveLearningSections: "Lima bahagian pembelajaran",
     },
 
     zh: {
       loading: "正在加载学生进度...",
       failedLoad: "无法加载学生进度。",
       pageTitle: "你的学习进度",
-      pageSubtitle: "跟踪你的讲义、测验分数、拖放分数和整体学生表现。",
+      pageSubtitle: "跟踪讲义、游戏活动、测验成绩和整体学习表现。",
       refresh: "刷新进度",
       overall: "总体",
       overallProgress: "总体进度",
@@ -168,23 +212,31 @@ export function StudentProgress() {
       lastLectureTopic: "最后讲义主题",
       performanceSummary: "表现总结",
       completed: "已完成",
+      notCompleted: "未完成",
       of: "共",
       performance: "表现",
-      dragDropActivity: "拖放活动",
-      quizAssessment: "测验与评估",
-      chapterProgress: "章节进度",
+      score: "分数",
+      moves: "步数",
+      time: "时间",
+      mistakes: "错误",
+      chapterProgress: "讲义主题进度",
       recentAchievements: "最近成就",
+      dragDropActivity: "拖放游戏",
+      immuneMatch: "免疫配对",
+      defenseLab: "防御实验室任务",
+      quizAssessment: "测验与评估",
       introduction: "免疫简介",
       types: "免疫类型",
-      components: "免疫系统组成",
-      defense: "身体防御机制",
+      pathogens: "病原体",
+      whiteBloodCells: "白细胞",
       vaccination: "疫苗接种",
       startedLecture: "开始学习讲义",
-      completedDrag: "完成拖放活动",
+      completedDrag: "完成拖放游戏",
+      completedImmuneMatch: "完成免疫配对",
+      completedDefenseLab: "完成防御实验室任务",
       completedQuiz: "完成测验与评估",
       earnedExcellent: "获得优秀表现徽章",
       overallReached: "总体进度达到",
-      score: "分数",
       noAchievements: "还没有成就。阅读讲义或完成活动即可解锁徽章。",
       noActivity: "还没有活动",
       noLecture: "还未查看讲义",
@@ -193,6 +245,8 @@ export function StudentProgress() {
       excellent: "优秀",
       good: "良好",
       needsImprovement: "需要改进",
+      activityProgress: "活动进度",
+      fiveLearningSections: "五个学习部分",
     },
 
     ar: {
@@ -200,7 +254,7 @@ export function StudentProgress() {
       failedLoad: "فشل تحميل تقدم الطالب.",
       pageTitle: "تقدم التعلم الخاص بك",
       pageSubtitle:
-        "تتبع ملاحظات المحاضرة ودرجة الاختبار ودرجة السحب والإفلات والأداء العام للطالب.",
+        "تتبع ملاحظات المحاضرة وأنشطة الألعاب ودرجة الاختبار والأداء العام.",
       refresh: "تحديث التقدم",
       overall: "الإجمالي",
       overallProgress: "التقدم الإجمالي",
@@ -217,23 +271,31 @@ export function StudentProgress() {
       lastLectureTopic: "آخر موضوع محاضرة",
       performanceSummary: "ملخص الأداء",
       completed: "اكتمل",
+      notCompleted: "غير مكتمل",
       of: "من",
       performance: "الأداء",
-      dragDropActivity: "نشاط السحب والإفلات",
-      quizAssessment: "الاختبار والتقييم",
-      chapterProgress: "تقدم الفصل",
+      score: "الدرجة",
+      moves: "الحركات",
+      time: "الوقت",
+      mistakes: "الأخطاء",
+      chapterProgress: "تقدم موضوعات المحاضرة",
       recentAchievements: "الإنجازات الأخيرة",
+      dragDropActivity: "لعبة السحب والإفلات",
+      immuneMatch: "مطابقة المناعة",
+      defenseLab: "مهمة مختبر الدفاع",
+      quizAssessment: "الاختبار والتقييم",
       introduction: "مقدمة إلى المناعة",
       types: "أنواع المناعة",
-      components: "مكونات الجهاز المناعي",
-      defense: "آليات دفاع الجسم",
+      pathogens: "مسببات المرض",
+      whiteBloodCells: "خلايا الدم البيضاء",
       vaccination: "التطعيم",
       startedLecture: "بدأ ملاحظات المحاضرة",
-      completedDrag: "أكمل نشاط السحب والإفلات",
+      completedDrag: "أكمل لعبة السحب والإفلات",
+      completedImmuneMatch: "أكمل مطابقة المناعة",
+      completedDefenseLab: "أكمل مهمة مختبر الدفاع",
       completedQuiz: "أكمل الاختبار والتقييم",
       earnedExcellent: "حصل على شارة الأداء الممتاز",
       overallReached: "وصل التقدم الإجمالي إلى",
-      score: "الدرجة",
       noAchievements:
         "لا توجد إنجازات بعد. اقرأ ملاحظات المحاضرة أو أكمل نشاطاً لفتح الشارات.",
       noActivity: "لا يوجد نشاط بعد",
@@ -243,16 +305,37 @@ export function StudentProgress() {
       excellent: "ممتاز",
       good: "جيد",
       needsImprovement: "يحتاج إلى تحسين",
+      activityProgress: "تقدم النشاط",
+      fiveLearningSections: "خمسة أقسام تعليمية",
     },
   };
 
   const currentText = text[language];
 
   const translatePerformance = (performance: string) => {
-    if (performance === "Excellent") return currentText.excellent;
-    if (performance === "Good") return currentText.good;
-    if (performance === "Needs Improvement") return currentText.needsImprovement;
+    if (performance === "Excellent") {
+      return currentText.excellent;
+    }
+
+    if (performance === "Good") {
+      return currentText.good;
+    }
+
+    if (performance === "Needs Improvement") {
+      return currentText.needsImprovement;
+    }
+
     return currentText.noActivity;
+  };
+
+  const formatTime = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, "0");
+
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+
+    return `${minutes}:${seconds}`;
   };
 
   const fetchProgress = async () => {
@@ -263,11 +346,11 @@ export function StudentProgress() {
 
       if (!user) {
         setStudentData(null);
-        setLoading(false);
         return;
       }
 
       const studentRef = doc(db, "students", user.uid);
+
       const studentSnap = await getDoc(studentRef);
 
       if (studentSnap.exists()) {
@@ -276,27 +359,12 @@ export function StudentProgress() {
         setStudentData({
           name: user.displayName || currentText.student,
           email: user.email || "",
-
-          lectureCompletedCount: 0,
-          lectureTotalTopics: 11,
-          lecturePercentage: 0,
-          lastLectureTopic: currentText.noLecture,
-
-          dragDropScore: 0,
-          dragDropTotal: 10,
-          dragDropPercentage: 0,
-          dragDropPerformance: "No activity yet",
-
-          quizScore: 0,
-          quizTotal: 10,
-          quizPercentage: 0,
-          quizPerformance: "No activity yet",
-
           lastActivity: currentText.noActivity,
         });
       }
     } catch (error) {
       console.error("Error loading progress:", error);
+
       alert(currentText.failedLoad);
     } finally {
       setLoading(false);
@@ -304,47 +372,96 @@ export function StudentProgress() {
   };
 
   useEffect(() => {
-    fetchProgress();
+    void fetchProgress();
   }, []);
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <p className="text-center text-gray-600">{currentText.loading}</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-cyan-50 to-purple-50">
+        <div className="rounded-[2rem] border border-white bg-white/90 px-10 py-8 text-center shadow-xl">
+          <RefreshCw className="mx-auto mb-4 h-10 w-10 animate-spin text-blue-600" />
+
+          <p className="font-semibold text-gray-600">{currentText.loading}</p>
+        </div>
       </div>
     );
   }
 
   const studentName = studentData?.name || currentText.student;
+
   const studentEmail = studentData?.email || currentText.noEmail;
 
-  const lectureCompletedCount = studentData?.lectureCompletedCount ?? 0;
-  const lectureTotalTopics = studentData?.lectureTotalTopics ?? 11;
-  const lecturePercentage = studentData?.lecturePercentage ?? 0;
+  const lastActivity = studentData?.lastActivity || currentText.noActivity;
+
+  const lectureCompletedTopics = studentData?.lectureCompletedTopics ?? [];
+
+  const lectureCompletedCount =
+    studentData?.lectureCompletedCount ?? lectureCompletedTopics.length;
+
+  const lectureTotalTopics = studentData?.lectureTotalTopics ?? 5;
+
+  const lecturePercentage =
+    studentData?.lecturePercentage ??
+    Math.round((lectureCompletedCount / lectureTotalTopics) * 100);
+
   const lastLectureTopic =
     studentData?.lastLectureTopic || currentText.noLecture;
 
   const dragScore = studentData?.dragDropScore ?? 0;
+
   const dragTotal = studentData?.dragDropTotal ?? 10;
+
   const dragPercentage = studentData?.dragDropPercentage ?? 0;
-  const dragPerformance = studentData?.dragDropPerformance ?? "No activity yet";
+
+  const dragPerformance =
+    studentData?.dragDropPerformance ?? "No activity yet";
+
+  const immuneMatchCompleted = studentData?.immuneMatchCompleted === true;
+
+  const immuneMatchMoves = studentData?.immuneMatchMoves ?? 0;
+
+  const immuneMatchTimeSeconds = studentData?.immuneMatchTimeSeconds ?? 0;
+
+  const immuneMatchPercentage = immuneMatchCompleted ? 100 : 0;
+
+  const defenseLabCompleted = studentData?.defenseLabCompleted === true;
+
+  const defenseLabScore = studentData?.defenseLabScore ?? 0;
+
+  const defenseLabMistakes = studentData?.defenseLabMistakes ?? 0;
+
+  const defenseLabPercentage = defenseLabCompleted ? defenseLabScore : 0;
 
   const quizScore = studentData?.quizScore ?? 0;
+
   const quizTotal = studentData?.quizTotal ?? 10;
+
   const quizPercentage = studentData?.quizPercentage ?? 0;
+
   const quizPerformance = studentData?.quizPerformance ?? "No activity yet";
 
-  const hasLectureActivity = lecturePercentage > 0;
-  const hasDragActivity = dragPercentage > 0;
-  const hasQuizActivity = quizPercentage > 0;
+  const hasLectureActivity = lectureCompletedCount > 0;
 
-  const completedActivities =
+  const hasDragActivity =
+    typeof studentData?.dragDropPercentage === "number";
+
+  const hasQuizActivity =
+    typeof studentData?.quizPercentage === "number";
+
+  const completedSections =
     (hasLectureActivity ? 1 : 0) +
     (hasDragActivity ? 1 : 0) +
+    (immuneMatchCompleted ? 1 : 0) +
+    (defenseLabCompleted ? 1 : 0) +
     (hasQuizActivity ? 1 : 0);
 
   const overallPercentage = Math.round(
-    (lecturePercentage + dragPercentage + quizPercentage) / 3
+    (lecturePercentage +
+      dragPercentage +
+      immuneMatchPercentage +
+      defenseLabPercentage +
+      quizPercentage) /
+      5
   );
 
   let overallPerformance = currentText.noActivity;
@@ -359,346 +476,519 @@ export function StudentProgress() {
 
   const badges =
     overallPercentage >= 80
-      ? 5
+      ? 6
       : overallPercentage >= 60
-      ? 3
+      ? 4
       : overallPercentage > 0
       ? 1
       : 0;
 
   const circleSize = 2 * Math.PI * 56;
 
+  const summaryItems: SummaryItem[] = [
+    {
+      title: currentText.lectureNotes,
+      percentage: lecturePercentage,
+      scoreText: `${lectureCompletedCount}/${lectureTotalTopics} ${currentText.topics}`,
+      description: lastLectureTopic,
+      icon: BookOpen,
+      iconStyle: "bg-green-100 text-green-700",
+    },
+
+    {
+      title: currentText.dragDropActivity,
+      percentage: dragPercentage,
+      scoreText: `${dragScore}/${dragTotal}`,
+      description: `${currentText.performance}: ${translatePerformance(
+        dragPerformance
+      )}`,
+      icon: Gamepad2,
+      iconStyle: "bg-blue-100 text-blue-700",
+    },
+
+    {
+      title: currentText.immuneMatch,
+      percentage: immuneMatchPercentage,
+      scoreText: immuneMatchCompleted
+        ? currentText.completed
+        : currentText.notCompleted,
+      description: immuneMatchCompleted
+        ? `${currentText.moves}: ${immuneMatchMoves} • ${
+            currentText.time
+          }: ${formatTime(immuneMatchTimeSeconds)}`
+        : currentText.noActivity,
+      icon: Brain,
+      iconStyle: "bg-purple-100 text-purple-700",
+    },
+
+    {
+      title: currentText.defenseLab,
+      percentage: defenseLabPercentage,
+      scoreText: defenseLabCompleted
+        ? `${defenseLabScore}/100`
+        : currentText.notCompleted,
+      description: defenseLabCompleted
+        ? `${currentText.mistakes}: ${defenseLabMistakes}`
+        : currentText.noActivity,
+      icon: ShieldCheck,
+      iconStyle: "bg-orange-100 text-orange-700",
+    },
+
+    {
+      title: currentText.quizAssessment,
+      percentage: quizPercentage,
+      scoreText: `${quizScore}/${quizTotal}`,
+      description: `${currentText.performance}: ${translatePerformance(
+        quizPerformance
+      )}`,
+      icon: FileQuestion,
+      iconStyle: "bg-pink-100 text-pink-700",
+    },
+  ];
+
+  const lectureTopics = [
+    {
+      id: "intro",
+      title: currentText.introduction,
+    },
+    {
+      id: "types",
+      title: currentText.types,
+    },
+    {
+      id: "pathogens",
+      title: currentText.pathogens,
+    },
+    {
+      id: "white-blood-cells",
+      title: currentText.whiteBloodCells,
+    },
+    {
+      id: "vaccination",
+      title: currentText.vaccination,
+    },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">
-            {currentText.pageTitle}
-          </h1>
-          <p className="text-gray-600">{currentText.pageSubtitle}</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-purple-50 px-6 py-8 font-nunito">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="font-fredoka text-4xl font-extrabold text-gray-900">
+              {currentText.pageTitle}
+            </h1>
+
+            <p className="mt-2 max-w-3xl text-gray-600">
+              {currentText.pageSubtitle}
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => void fetchProgress()}
+            variant="outline"
+            className="gap-2 bg-white shadow-sm"
+          >
+            <RefreshCw className="h-4 w-4" />
+
+            {currentText.refresh}
+          </Button>
         </div>
 
-        <Button onClick={fetchProgress} variant="outline" className="gap-2">
-          <RefreshCw className="w-4 h-4" />
-          {currentText.refresh}
-        </Button>
-      </div>
+        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardContent className="p-6 text-center">
+              <div className="relative mx-auto mb-4 h-32 w-32">
+                <svg className="h-32 w-32 -rotate-90 transform">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#e5e7eb"
+                    strokeWidth="8"
+                    fill="none"
+                  />
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="border-none shadow-lg">
-          <CardContent className="p-6 text-center">
-            <div className="relative w-32 h-32 mx-auto mb-4">
-              <svg className="w-32 h-32 transform -rotate-90">
-                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="8" fill="none" />
-                <circle
-                  cx="64"
-                  cy="64"
-                  r="56"
-                  stroke="#3b82f6"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${circleSize}`}
-                  strokeDashoffset={`${circleSize * (1 - overallPercentage / 100)}`}
-                  strokeLinecap="round"
-                />
-              </svg>
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#3b82f6"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${circleSize}`}
+                    strokeDashoffset={`${
+                      circleSize * (1 - overallPercentage / 100)
+                    }`}
+                    strokeLinecap="round"
+                  />
+                </svg>
 
-              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-3xl font-extrabold text-blue-600">
+                      {overallPercentage}%
+                    </div>
+
+                    <div className="text-xs text-gray-600">
+                      {currentText.overall}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="font-fredoka text-lg font-extrabold">
+                {currentText.overallProgress}
+              </h3>
+
+              <p className="mt-1 text-sm text-gray-500">
+                {overallPerformance}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardContent className="p-6 text-center">
+              <div className="relative mx-auto mb-4 h-32 w-32">
+                <svg className="h-32 w-32 -rotate-90 transform">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#e5e7eb"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#10b981"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${circleSize}`}
+                    strokeDashoffset={`${
+                      circleSize * (1 - lecturePercentage / 100)
+                    }`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-3xl font-extrabold text-green-600">
+                      {lecturePercentage}%
+                    </div>
+
+                    <div className="text-xs text-gray-600">
+                      {currentText.lecture}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="font-fredoka text-lg font-extrabold">
+                {currentText.lectureNotes}
+              </h3>
+
+              <p className="mt-1 text-sm text-gray-500">
+                {lectureCompletedCount}/{lectureTotalTopics}{" "}
+                {currentText.topics}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardContent className="p-6 text-center">
+              <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">
-                    {overallPercentage}%
+                  <div className="text-5xl font-extrabold text-blue-600">
+                    {completedSections}
                   </div>
-                  <div className="text-xs text-gray-600">
-                    {currentText.overall}
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <h3 className="font-semibold mb-1">
-              {currentText.overallProgress}
-            </h3>
-            <p className="text-sm text-gray-500">{overallPerformance}</p>
-          </CardContent>
-        </Card>
+                  <div className="text-sm text-gray-600">/5</div>
 
-        <Card className="border-none shadow-lg">
-          <CardContent className="p-6 text-center">
-            <div className="relative w-32 h-32 mx-auto mb-4">
-              <svg className="w-32 h-32 transform -rotate-90">
-                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="8" fill="none" />
-                <circle
-                  cx="64"
-                  cy="64"
-                  r="56"
-                  stroke="#10b981"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${circleSize}`}
-                  strokeDashoffset={`${circleSize * (1 - lecturePercentage / 100)}`}
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">
-                    {lecturePercentage}%
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {currentText.lecture}
+                  <div className="mt-1 text-xs text-gray-600">
+                    {currentText.sections}
                   </div>
                 </div>
               </div>
-            </div>
 
-            <h3 className="font-semibold mb-1">{currentText.lectureNotes}</h3>
-            <p className="text-sm text-gray-500">
-              {lectureCompletedCount}/{lectureTotalTopics} {currentText.topics}
-            </p>
-          </CardContent>
-        </Card>
+              <h3 className="font-fredoka text-lg font-extrabold">
+                {currentText.sectionsCompleted}
+              </h3>
 
-        <Card className="border-none shadow-lg">
-          <CardContent className="p-6 text-center">
-            <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-blue-600 mb-1">
-                  {completedActivities}
-                </div>
-                <div className="text-sm text-gray-600">/3</div>
-                <div className="text-xs text-gray-600 mt-1">
-                  {currentText.sections}
-                </div>
+              <p className="mt-1 text-sm text-gray-500">
+                {currentText.fiveLearningSections}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardContent className="p-6 text-center">
+              <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
+                <Trophy className="h-20 w-20 text-yellow-500" />
               </div>
-            </div>
 
-            <h3 className="font-semibold mb-1">
-              {currentText.sectionsCompleted}
-            </h3>
-          </CardContent>
-        </Card>
+              <div className="text-3xl font-extrabold">{badges}</div>
 
-        <Card className="border-none shadow-lg">
-          <CardContent className="p-6 text-center">
-            <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-              <Trophy className="w-20 h-20 text-yellow-500" />
-            </div>
+              <h3 className="font-fredoka text-lg font-extrabold">
+                {currentText.badges}
+              </h3>
+            </CardContent>
+          </Card>
+        </div>
 
-            <div className="text-3xl font-bold mb-1">{badges}</div>
-            <h3 className="font-semibold">{currentText.badges}</h3>
-          </CardContent>
-        </Card>
+        <div className="mb-8 grid gap-6 lg:grid-cols-2">
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-fredoka flex items-center gap-2 text-2xl">
+                <User className="h-6 w-6 text-blue-600" />
+
+                {currentText.studentInformation}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <InformationRow
+                label={currentText.studentName}
+                value={studentName}
+              />
+
+              <InformationRow
+                label={currentText.email}
+                value={studentEmail}
+              />
+
+              <InformationRow
+                label={currentText.lastActivity}
+                value={lastActivity}
+              />
+
+              <InformationRow
+                label={currentText.lastLectureTopic}
+                value={lastLectureTopic}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-fredoka flex items-center gap-2 text-2xl">
+                <Activity className="h-6 w-6 text-green-600" />
+
+                {currentText.performanceSummary}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              {summaryItems.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <div
+                    key={item.title}
+                    className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.iconStyle}`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <span className="font-bold text-gray-800">
+                          {item.title}
+                        </span>
+                      </div>
+
+                      <span className="text-sm font-extrabold text-blue-700">
+                        {item.scoreText}
+                      </span>
+                    </div>
+
+                    <Progress value={item.percentage} className="h-2" />
+
+                    <p className="mt-2 text-sm text-gray-500">
+                      {item.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-fredoka text-2xl">
+                {currentText.chapterProgress}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              {lectureTopics.map((topic) => {
+                const topicCompleted = lectureCompletedTopics.includes(
+                  topic.id
+                );
+
+                return (
+                  <div key={topic.id}>
+                    <div className="mb-2 flex justify-between">
+                      <span className="text-sm font-medium">{topic.title}</span>
+
+                      <span
+                        className={`text-sm font-bold ${
+                          topicCompleted ? "text-green-600" : "text-gray-400"
+                        }`}
+                      >
+                        {topicCompleted ? "100%" : "0%"}
+                      </span>
+                    </div>
+
+                    <Progress
+                      value={topicCompleted ? 100 : 0}
+                      className="h-2"
+                    />
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white/95 shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-fredoka text-2xl">
+                {currentText.recentAchievements}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {completedSections > 0 ? (
+                <>
+                  {hasLectureActivity && (
+                    <AchievementCard
+                      icon={CheckCircle}
+                      iconStyle="bg-green-600"
+                      cardStyle="bg-green-50"
+                      title={currentText.startedLecture}
+                      description={`${currentText.completed} ${lectureCompletedCount}/${lectureTotalTopics} ${currentText.topics}`}
+                    />
+                  )}
+
+                  {hasDragActivity && (
+                    <AchievementCard
+                      icon={Medal}
+                      iconStyle="bg-blue-600"
+                      cardStyle="bg-blue-50"
+                      title={currentText.completedDrag}
+                      description={`${currentText.score}: ${dragScore}/${dragTotal}`}
+                    />
+                  )}
+
+                  {immuneMatchCompleted && (
+                    <AchievementCard
+                      icon={Brain}
+                      iconStyle="bg-purple-600"
+                      cardStyle="bg-purple-50"
+                      title={currentText.completedImmuneMatch}
+                      description={`${currentText.moves}: ${immuneMatchMoves} • ${
+                        currentText.time
+                      }: ${formatTime(immuneMatchTimeSeconds)}`}
+                    />
+                  )}
+
+                  {defenseLabCompleted && (
+                    <AchievementCard
+                      icon={ShieldCheck}
+                      iconStyle="bg-orange-500"
+                      cardStyle="bg-orange-50"
+                      title={currentText.completedDefenseLab}
+                      description={`${currentText.score}: ${defenseLabScore}/100 • ${currentText.mistakes}: ${defenseLabMistakes}`}
+                    />
+                  )}
+
+                  {hasQuizActivity && (
+                    <AchievementCard
+                      icon={Award}
+                      iconStyle="bg-pink-600"
+                      cardStyle="bg-pink-50"
+                      title={currentText.completedQuiz}
+                      description={`${currentText.score}: ${quizScore}/${quizTotal}`}
+                    />
+                  )}
+
+                  {overallPercentage >= 80 && (
+                    <AchievementCard
+                      icon={Trophy}
+                      iconStyle="bg-yellow-500"
+                      cardStyle="bg-yellow-50"
+                      title={currentText.earnedExcellent}
+                      description={`${currentText.overallReached} ${overallPercentage}%`}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="rounded-2xl bg-gray-50 p-5 text-center">
+                  <AlertCircle className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+
+                  <p className="text-gray-600">
+                    {currentText.noAchievements}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InformationRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-blue-50 p-4">
+      <p className="text-sm font-bold text-gray-500">{label}</p>
+
+      <p className="mt-1 break-all font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+
+function AchievementCard({
+  icon: Icon,
+  iconStyle,
+  cardStyle,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  iconStyle: string;
+  cardStyle: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className={`flex items-center gap-4 rounded-2xl p-4 ${cardStyle}`}>
+      <div
+        className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${iconStyle}`}
+      >
+        <Icon className="h-6 w-6 text-white" />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="w-5 h-5 text-blue-600" />
-              {currentText.studentInformation}
-            </CardTitle>
-          </CardHeader>
+      <div className="flex-1">
+        <h4 className="text-sm font-extrabold text-gray-900">{title}</h4>
 
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-500">{currentText.studentName}</p>
-              <p className="font-semibold">{studentName}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-500">{currentText.email}</p>
-              <p className="font-semibold break-all">{studentEmail}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-500">{currentText.lastActivity}</p>
-              <p className="font-semibold">
-                {studentData?.lastActivity || currentText.noActivity}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-500">
-                {currentText.lastLectureTopic}
-              </p>
-              <p className="font-semibold">{lastLectureTopic}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-green-600" />
-              {currentText.performanceSummary}
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-5">
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-green-600" />
-                  {currentText.lectureNotes}
-                </span>
-                <span className="text-sm font-bold text-green-600">
-                  {lecturePercentage}%
-                </span>
-              </div>
-              <Progress value={lecturePercentage} className="h-2" />
-              <p className="text-sm text-gray-500 mt-2">
-                {currentText.completed} {lectureCompletedCount} {currentText.of}{" "}
-                {lectureTotalTopics} {currentText.topics}
-              </p>
-            </div>
-
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  <Gamepad2 className="w-4 h-4 text-blue-600" />
-                  {currentText.dragDropActivity}
-                </span>
-                <span className="text-sm font-bold text-blue-600">
-                  {dragScore}/{dragTotal}
-                </span>
-              </div>
-              <Progress value={dragPercentage} className="h-2" />
-              <p className="text-sm text-gray-500 mt-2">
-                {currentText.performance}: {translatePerformance(dragPerformance)}
-              </p>
-            </div>
-
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  <FileQuestion className="w-4 h-4 text-purple-600" />
-                  {currentText.quizAssessment}
-                </span>
-                <span className="text-sm font-bold text-purple-600">
-                  {quizScore}/{quizTotal}
-                </span>
-              </div>
-              <Progress value={quizPercentage} className="h-2" />
-              <p className="text-sm text-gray-500 mt-2">
-                {currentText.performance}: {translatePerformance(quizPerformance)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle>{currentText.chapterProgress}</CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            {[
-              { title: currentText.introduction, value: lectureCompletedCount >= 1 ? 100 : 0 },
-              { title: currentText.types, value: lectureCompletedCount >= 2 ? 100 : 0 },
-              { title: currentText.components, value: lectureCompletedCount >= 5 ? 100 : 0 },
-              { title: currentText.defense, value: lectureCompletedCount >= 10 ? 100 : 0 },
-              { title: currentText.vaccination, value: lectureCompletedCount >= 11 ? 100 : 0 },
-            ].map((item) => (
-              <div key={item.title}>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">{item.title}</span>
-                  <span className="text-sm font-bold text-blue-600">
-                    {item.value}%
-                  </span>
-                </div>
-                <Progress value={item.value} className="h-2" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle>{currentText.recentAchievements}</CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            {overallPercentage > 0 ? (
-              <>
-                {hasLectureActivity && (
-                  <div className="flex items-center gap-4 p-3 bg-green-50 rounded-lg">
-                    <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="w-6 h-6 text-white" />
-                    </div>
-
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">
-                        {currentText.startedLecture}
-                      </h4>
-                      <p className="text-xs text-gray-600">
-                        {currentText.completed} {lectureCompletedCount}/
-                        {lectureTotalTopics} {currentText.topics}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {hasDragActivity && (
-                  <div className="flex items-center gap-4 p-3 bg-yellow-50 rounded-lg">
-                    <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Medal className="w-6 h-6 text-white" />
-                    </div>
-
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">
-                        {currentText.completedDrag}
-                      </h4>
-                      <p className="text-xs text-gray-600">
-                        {currentText.score}: {dragScore}/{dragTotal}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {hasQuizActivity && (
-                  <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Award className="w-6 h-6 text-white" />
-                    </div>
-
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">
-                        {currentText.completedQuiz}
-                      </h4>
-                      <p className="text-xs text-gray-600">
-                        {currentText.score}: {quizScore}/{quizTotal}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {overallPercentage >= 80 && (
-                  <div className="flex items-center gap-4 p-3 bg-purple-50 rounded-lg">
-                    <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Trophy className="w-6 h-6 text-white" />
-                    </div>
-
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">
-                        {currentText.earnedExcellent}
-                      </h4>
-                      <p className="text-xs text-gray-600">
-                        {currentText.overallReached} {overallPercentage}%
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="p-4 bg-gray-50 rounded-lg text-center">
-                <p className="text-gray-600">{currentText.noAchievements}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <p className="mt-1 text-xs text-gray-600">{description}</p>
       </div>
     </div>
   );

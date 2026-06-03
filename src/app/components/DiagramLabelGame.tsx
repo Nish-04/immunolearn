@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowLeft,
@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { LucideIcon } from "lucide-react";
+import {
+  arrayUnion,
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 type LabelItem = {
   id: string;
@@ -86,8 +93,8 @@ const labelItems: LabelItem[] = [
 ];
 
 /*
-  Positions below are adjusted to fit inside the blank answer boxes
-  already included in body-defense-diagram.png.
+  Kedudukan label dikekalkan sama seperti code asal kamu.
+  Jangan ubah nilai ini jika kedudukan label sudah tepat.
 */
 const targets: TargetItem[] = [
   {
@@ -159,6 +166,12 @@ export function DiagramLabelGame() {
     "neutral" | "success" | "error"
   >("neutral");
 
+  const [savingProgress, setSavingProgress] = useState(false);
+
+  const [progressSaved, setProgressSaved] = useState(false);
+
+  const [saveError, setSaveError] = useState(false);
+
   const totalTargets = targets.length;
 
   const completedCount = completedTargetIds.length;
@@ -170,6 +183,64 @@ export function DiagramLabelGame() {
   }, [completedCount, totalTargets]);
 
   const score = Math.max(0, completedCount * 20 - mistakes * 5);
+
+  /*
+    Progress disimpan secara automatik apabila semua label selesai.
+  */
+  useEffect(() => {
+    if (!isCompleted || progressSaved || savingProgress) {
+      return;
+    }
+
+    const saveDefenseLabProgress = async () => {
+      const user = auth.currentUser;
+
+      if (!user) {
+        console.error("Student is not logged in.");
+
+        setSaveError(true);
+
+        return;
+      }
+
+      setSavingProgress(true);
+
+      setSaveError(false);
+
+      try {
+        await setDoc(
+          doc(db, "students", user.uid),
+          {
+            name: user.displayName || "Student",
+            email: user.email || "",
+
+            completedActivities: arrayUnion("defense-lab-mission"),
+
+            defenseLabCompleted: true,
+            defenseLabScore: score,
+            defenseLabMistakes: mistakes,
+            defenseLabCompletedAt: serverTimestamp(),
+
+            lastActivity: "Defense Lab Mission",
+            updatedAt: serverTimestamp(),
+          },
+          {
+            merge: true,
+          }
+        );
+
+        setProgressSaved(true);
+      } catch (error) {
+        console.error("Failed to save Defense Lab Mission progress:", error);
+
+        setSaveError(true);
+      } finally {
+        setSavingProgress(false);
+      }
+    };
+
+    void saveDefenseLabProgress();
+  }, [isCompleted, progressSaved, savingProgress, score, mistakes]);
 
   const resetGame = () => {
     setSelectedLabelId(null);
@@ -183,6 +254,12 @@ export function DiagramLabelGame() {
     );
 
     setFeedbackType("neutral");
+
+    setSavingProgress(false);
+
+    setProgressSaved(false);
+
+    setSaveError(false);
   };
 
   const handleLabelClick = (labelId: string) => {
@@ -332,25 +409,39 @@ export function DiagramLabelGame() {
               <div className="h-3 overflow-hidden rounded-full bg-gray-200">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-blue-500 via-cyan-500 to-green-500 transition-all duration-500"
-                  style={{ width: `${progress}%` }}
+                  style={{
+                    width: `${progress}%`,
+                  }}
                 ></div>
               </div>
             </div>
 
             {isCompleted && (
-              <div className="mb-5 flex items-center gap-4 rounded-3xl bg-gradient-to-r from-green-500 to-emerald-500 p-5 text-white shadow-lg">
-                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20">
-                  <Trophy className="h-9 w-9" />
+              <div className="mb-5 rounded-3xl bg-gradient-to-r from-green-500 to-emerald-500 p-5 text-white shadow-lg">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20">
+                    <Trophy className="h-9 w-9" />
+                  </div>
+
+                  <div>
+                    <h2 className="font-fredoka text-2xl font-extrabold">
+                      Mission Complete!
+                    </h2>
+
+                    <p className="font-medium">
+                      You successfully labeled all body defense mechanisms.
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h2 className="font-fredoka text-2xl font-extrabold">
-                    Mission Complete!
-                  </h2>
+                <div className="mt-4 rounded-2xl bg-white/20 px-4 py-3 text-sm font-bold">
+                  {savingProgress && "Saving your progress..."}
 
-                  <p className="font-medium">
-                    You successfully labeled all body defense mechanisms.
-                  </p>
+                  {progressSaved &&
+                    "Progress saved successfully to Student Progress."}
+
+                  {saveError &&
+                    "Progress could not be saved. Please check your login and Firestore settings."}
                 </div>
               </div>
             )}

@@ -11,6 +11,13 @@ import {
   Trophy,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import {
+  arrayUnion,
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 type GameCard = {
   uniqueId: string;
@@ -106,13 +113,22 @@ export function MemoryCardGame() {
   const [isChecking, setIsChecking] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
 
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [progressSaved, setProgressSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
   const totalPairs = cardPairs.length;
+
   const gameCompleted = matchedPairs === totalPairs;
 
   const progress = useMemo(() => {
     return Math.round((matchedPairs / totalPairs) * 100);
   }, [matchedPairs, totalPairs]);
 
+  /*
+    Timer begins only after the student clicks the first card.
+    Timer stops when all matching pairs are completed.
+  */
   useEffect(() => {
     if (!gameStarted || gameCompleted) {
       return;
@@ -125,6 +141,61 @@ export function MemoryCardGame() {
     return () => window.clearInterval(timer);
   }, [gameStarted, gameCompleted]);
 
+  /*
+    Save progress automatically when the game is completed.
+    The information is merged into the existing student document.
+  */
+  useEffect(() => {
+    if (!gameCompleted || progressSaved || savingProgress) {
+      return;
+    }
+
+    const saveImmuneMatchProgress = async () => {
+      const user = auth.currentUser;
+
+      if (!user) {
+        console.error("Student is not logged in.");
+        setSaveError(true);
+        return;
+      }
+
+      setSavingProgress(true);
+      setSaveError(false);
+
+      try {
+        await setDoc(
+          doc(db, "students", user.uid),
+          {
+            name: user.displayName || "Student",
+            email: user.email || "",
+
+            completedActivities: arrayUnion("immune-match"),
+
+            immuneMatchCompleted: true,
+            immuneMatchMoves: moves,
+            immuneMatchTimeSeconds: seconds,
+            immuneMatchCompletedAt: serverTimestamp(),
+
+            lastActivity: "Immune Match",
+            updatedAt: serverTimestamp(),
+          },
+          {
+            merge: true,
+          }
+        );
+
+        setProgressSaved(true);
+      } catch (error) {
+        console.error("Failed to save Immune Match progress:", error);
+        setSaveError(true);
+      } finally {
+        setSavingProgress(false);
+      }
+    };
+
+    void saveImmuneMatchProgress();
+  }, [gameCompleted, moves, seconds, progressSaved, savingProgress]);
+
   const resetGame = () => {
     setCards(createGameCards());
     setSelectedCards([]);
@@ -133,6 +204,10 @@ export function MemoryCardGame() {
     setSeconds(0);
     setIsChecking(false);
     setGameStarted(false);
+
+    setSavingProgress(false);
+    setProgressSaved(false);
+    setSaveError(false);
   };
 
   const handleCardClick = (clickedCard: GameCard) => {
@@ -155,7 +230,10 @@ export function MemoryCardGame() {
     setCards((currentCards) =>
       currentCards.map((card) =>
         card.uniqueId === clickedCard.uniqueId
-          ? { ...card, isFlipped: true }
+          ? {
+              ...card,
+              isFlipped: true,
+            }
           : card
       )
     );
@@ -218,24 +296,24 @@ export function MemoryCardGame() {
     >
       <div className="absolute inset-0 bg-white/35 backdrop-blur-[1px]"></div>
 
-      <div className="relative z-10 max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-6">
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <button
             type="button"
             onClick={() => navigate("/activities")}
             className="inline-flex w-fit items-center gap-2 rounded-full bg-white/95 px-5 py-3 font-bold text-indigo-800 shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
             Back
           </button>
 
           <div className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-purple-700/85 px-4 py-2 text-sm font-bold text-white shadow-md">
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="h-4 w-4" />
               Flip, Match, and Protect!
             </div>
 
-            <h1 className="font-fredoka mt-2 text-5xl font-extrabold tracking-tight text-yellow-300 drop-shadow-lg md:text-6xl">
+            <h1 className="mt-2 font-fredoka text-5xl font-extrabold tracking-tight text-yellow-300 drop-shadow-lg md:text-6xl">
               Immune
             </h1>
 
@@ -249,7 +327,7 @@ export function MemoryCardGame() {
             onClick={resetGame}
             className="inline-flex w-fit items-center gap-2 rounded-full bg-white/95 px-5 py-3 font-bold text-indigo-800 shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl"
           >
-            <RotateCcw className="w-5 h-5" />
+            <RotateCcw className="h-5 w-5" />
             Restart
           </button>
         </div>
@@ -257,18 +335,19 @@ export function MemoryCardGame() {
         <div className="mb-6 grid gap-4 rounded-[2rem] bg-white/95 p-4 shadow-2xl sm:grid-cols-3">
           <div className="flex items-center justify-center gap-3 rounded-2xl bg-blue-50 px-4 py-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-              <Footprints className="w-6 h-6" />
+              <Footprints className="h-6 w-6" />
             </div>
 
             <div>
               <p className="text-sm font-bold text-gray-500">Moves</p>
+
               <p className="text-3xl font-extrabold text-blue-600">{moves}</p>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-3 rounded-2xl bg-green-50 px-4 py-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
-              <CheckCircle className="w-6 h-6" />
+              <CheckCircle className="h-6 w-6" />
             </div>
 
             <div>
@@ -282,7 +361,7 @@ export function MemoryCardGame() {
 
           <div className="flex items-center justify-center gap-3 rounded-2xl bg-purple-50 px-4 py-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-purple-600">
-              <Clock3 className="w-6 h-6" />
+              <Clock3 className="h-6 w-6" />
             </div>
 
             <div>
@@ -298,20 +377,32 @@ export function MemoryCardGame() {
         <div className="grid gap-6 lg:grid-cols-[1fr_270px]">
           <div className="rounded-[2rem] bg-white/90 p-5 shadow-2xl backdrop-blur">
             {gameCompleted && (
-              <div className="mb-5 flex items-center gap-4 rounded-3xl bg-gradient-to-r from-green-500 to-emerald-500 p-5 text-white shadow-lg">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20">
-                  <Trophy className="w-9 h-9" />
+              <div className="mb-5 rounded-3xl bg-gradient-to-r from-green-500 to-emerald-500 p-5 text-white shadow-lg">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20">
+                    <Trophy className="h-9 w-9" />
+                  </div>
+
+                  <div>
+                    <h2 className="font-fredoka text-2xl font-extrabold">
+                      Great Job!
+                    </h2>
+
+                    <p className="font-medium">
+                      You completed Immune Match in {moves} moves and{" "}
+                      {formatTime(seconds)}.
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h2 className="font-fredoka text-2xl font-extrabold">
-                    Great Job!
-                  </h2>
+                <div className="mt-4 rounded-2xl bg-white/20 px-4 py-3 text-sm font-bold">
+                  {savingProgress && "Saving your progress..."}
 
-                  <p className="font-medium">
-                    You completed Immune Match in {moves} moves and{" "}
-                    {formatTime(seconds)}.
-                  </p>
+                  {progressSaved &&
+                    "Progress saved successfully to Student Progress."}
+
+                  {saveError &&
+                    "Progress could not be saved. Please check your login and Firestore settings."}
                 </div>
               </div>
             )}
@@ -319,13 +410,16 @@ export function MemoryCardGame() {
             <div className="mb-5">
               <div className="mb-2 flex justify-between text-sm font-bold text-gray-600">
                 <span>Game Progress</span>
+
                 <span>{progress}%</span>
               </div>
 
               <div className="h-3 overflow-hidden rounded-full bg-gray-200">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-500"
-                  style={{ width: `${progress}%` }}
+                  style={{
+                    width: `${progress}%`,
+                  }}
                 ></div>
               </div>
             </div>
